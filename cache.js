@@ -10,31 +10,26 @@ const fs = require('fs');
 const path = require('path');
 
 class Cache {
-  constructor(options = {}) {
-    // Define cache file path - stores in the same directory as the script
-    this.cacheFile = path.join(__dirname, 'cache-data.json');
+  constructor(config) {
+    // Configuration from config module
+    this.cacheFile = path.join(process.cwd(), config.cache.cacheFile);
+    this.maxSize = config.cache.maxSize;
+    this.ttl = config.cache.ttl;
+    this.enabled = config.cache.enabled;
+    this.verbose = config.logging.verbose;
 
-    // Maximum number of cached entries (prevents unlimited growth)
-    // Default: 100 entries
-    this.maxSize = options.maxSize || 100;
-
-    // Time To Live in milliseconds (how long cache entries are valid)
-    // Default: 1 hour (3600000 ms)
-    this.ttl = options.ttl || 3600000; // 1 hour
-
-    // Using a Map to store cached responses in memory
+    // Map stores: key -> { value, timestamp, accessCount }
     this.store = new Map();
 
     // Track access order for LRU (Least Recently Used) eviction
     this.accessOrder = [];
 
-    // Load existing cache from disk when cache is initialized
+    // Load existing cache from disk
     this.load();
   }
 
   /**
    * Load cache from disk into memory
-   * This runs when the cache is first created
    */
   load() {
     try {
@@ -42,8 +37,7 @@ class Cache {
         const data = fs.readFileSync(this.cacheFile, 'utf8');
         const parsed = JSON.parse(data);
 
-        // Convert the plain object back into a Map
-        // JSON can't store Maps directly, so we store as array of [key, value] pairs
+        // Convert array back to Map
         this.store = new Map(parsed.entries);
         this.accessOrder = parsed.accessOrder || [];
 
@@ -54,7 +48,6 @@ class Cache {
       }
     } catch (error) {
       console.error('⚠️  Error loading cache from disk:', error.message);
-      // If loading fails, start with empty cache
       this.store = new Map();
       this.accessOrder = [];
     }
@@ -62,7 +55,6 @@ class Cache {
 
   /**
    * Save cache from memory to disk
-   * This persists the cache between process restarts
    */
   save() {
     try {
@@ -83,8 +75,7 @@ class Cache {
   }
 
   /**
-   * Generate a unique cache key based on HTTP method and URL
-   * Example: "GET:/products" or "POST:/users"
+   * Generate a unique cache key
    */
   generateKey(method, url) {
     return `${method}:${url}`;
@@ -147,11 +138,10 @@ class Cache {
 
   /**
    * Get a cached response
-   * @param {string} method - HTTP method (GET, POST, etc.)
-   * @param {string} url - Request URL
-   * @returns {Object|null} - Cached response or null if not found
    */
   get(method, url) {
+    if (!this.enabled) return null;
+
     const key = this.generateKey(method, url);
     const entry = this.store.get(key);
 
@@ -175,12 +165,11 @@ class Cache {
   }
 
   /**
-   * Store a response in cache (both memory and disk)
-   * @param {string} method - HTTP method
-   * @param {string} url - Request URL
-   * @param {Object} response - Response data to cache
+   * Store a response in cache
    */
   set(method, url, response) {
+    if (!this.enabled) return;
+
     const key = this.generateKey(method, url);
 
     // If we're at max size, evict the least recently used entry
@@ -207,14 +196,13 @@ class Cache {
     // Save to disk
     this.save();
 
-    console.log(`✓ Cached: ${key} (${this.store.size}/${this.maxSize})`);
+    if (this.verbose) {
+      console.log(`✓ Cached: ${key} (${this.store.size}/${this.maxSize})`);
+    }
   }
 
   /**
    * Check if a response exists in cache and is not expired
-   * @param {string} method - HTTP method
-   * @param {string} url - Request URL
-   * @returns {boolean}
    */
   has(method, url) {
     const key = this.generateKey(method, url);
@@ -233,7 +221,7 @@ class Cache {
   }
 
   /**
-   * Clear all cached responses (both memory and disk)
+   * Clear all cached responses
    */
   clear() {
     const size = this.store.size;
@@ -253,7 +241,6 @@ class Cache {
 
   /**
    * Get cache statistics
-   * @returns {Object} - Stats about the cache
    */
   getStats() {
     // Calculate total cache size in bytes
@@ -297,9 +284,6 @@ class Cache {
   }
 }
 
-// Export a single instance with default configuration
-// You can customize: new Cache({ maxSize: 50, ttl: 1800000 }) for 30min TTL
-module.exports = new Cache({
-  maxSize: 100, // Max 100 cached entries
-  ttl: 3600000, // 1 hour TTL (in milliseconds)
-});
+// Create a factory function instead of direct export
+// This allows us to pass config when creating the cache
+module.exports = Cache;
