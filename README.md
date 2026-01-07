@@ -4,6 +4,15 @@ A simple caching proxy server built with Node.js. This server caches responses f
 
 ## Usage
 
-```bash
-caching-proxy --port <number> --origin <url>
-```
+### Make index.js executable (Linux/Mac)
+
+chmod +x index.js
+
+### Link it globally (creates the caching-proxy command)
+
+npm link
+caching-proxy --port 3000 --origin http://dummyjson.com
+
+### Or if you want to run without linking:
+
+node index.js --port 3000 --origin http://dummyjson.com
