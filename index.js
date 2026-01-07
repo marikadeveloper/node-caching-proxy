@@ -76,3 +76,57 @@ const argv = yargs(hideBin(process.argv))
   .alias('h', 'help')
   .version('1.0.0')
   .alias('v', 'version').argv;
+
+/**
+ * Handle CLI commands
+ */
+function main() {
+  // Handle --clear-cache command
+  if (argv['clear-cache']) {
+    console.log('🧹 Clearing cache...');
+    cache.clear();
+    process.exit(0);
+  }
+
+  // Start the proxy server
+  console.log('Starting caching proxy server...\n');
+  console.log(`Configuration:`);
+  console.log(`  Port:   ${argv.port}`);
+  console.log(`  Origin: ${argv.origin}\n`);
+
+  const server = new ProxyServer(argv.port, argv.origin);
+  server.start();
+
+  // Graceful shutdown on Ctrl+C
+  process.on('SIGINT', () => {
+    console.log('\n\n👋 Shutting down gracefully...');
+
+    // Show cache stats before exiting
+    const stats = cache.getStats();
+    console.log(`\nCache Statistics:`);
+    console.log(`  Total cached responses: ${stats.size}`);
+
+    if (stats.size > 0) {
+      console.log(`  Cached URLs:`);
+      stats.keys.forEach((key) => {
+        console.log(`    - ${key}`);
+      });
+    }
+
+    server.stop();
+    process.exit(0);
+  });
+
+  // Handle uncaught errors
+  process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error.message);
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+  });
+}
+
+main();
