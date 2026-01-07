@@ -29,6 +29,7 @@ First request (should be MISS)
 curl -i http://localhost:3000/products
 
 Look for: X-Cache: MISS in the headers
+You should see "cache-data.json" file created in your project folder
 
 #### Second request (should be HIT)
 
