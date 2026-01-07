@@ -12,7 +12,8 @@
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const ProxyServer = require('./server');
-const cache = require('./cache');
+const Cache = require('./cache');
+const config = require('./config');
 
 // Parse command line arguments using yargs
 // hideBin removes the first two arguments (node path and script path)
@@ -41,10 +42,45 @@ const argv = yargs(hideBin(process.argv))
     description: 'Clear the cache and exit',
     default: false,
   })
+  // Define the --init-config option
+  .option('init-config', {
+    type: 'boolean',
+    description: 'Create a default configuration file',
+    default: false,
+  })
+  // Define the --show-config option
+  .option('show-config', {
+    type: 'boolean',
+    description: 'Display current configuration',
+    default: false,
+  })
+  // Config override options
+  .option('max-size', {
+    type: 'number',
+    description: 'Maximum number of cache entries',
+  })
+  .option('ttl', {
+    type: 'number',
+    description: 'Cache TTL in seconds',
+  })
+  .option('timeout', {
+    type: 'number',
+    description: 'Request timeout in seconds',
+  })
+  .option('verbose', {
+    alias: 'v',
+    type: 'boolean',
+    description: 'Enable verbose logging',
+  })
+  .option('no-cache', {
+    type: 'boolean',
+    description: 'Disable caching (proxy only mode)',
+    default: false,
+  })
   // Custom validation
   .check((argv) => {
-    // If --clear-cache is provided, we don't need other options
-    if (argv['clear-cache']) {
+    // If --clear-cache, --init-config, or --show-config, we don't need other options
+    if (argv['clear-cache'] || argv['init-config'] || argv['show-config']) {
       return true;
     }
 
@@ -79,6 +115,32 @@ const argv = yargs(hideBin(process.argv))
   .alias('v', 'version').argv;
 
 function main() {
+  if (argv['init-config']) {
+    console.log('🔧 Creating default configuration file...');
+    config.createDefault();
+    process.exit(0);
+  }
+
+  if (argv['show-config']) {
+    config.display();
+    process.exit(0);
+  }
+
+  // Apply CLI overrides to configuration
+  config.override(argv);
+
+  // Validate configuration
+  const validation = config.validate();
+  if (!validation.valid) {
+    console.error('❌ Configuration validation failed:');
+    validation.errors.forEach((err) => console.error(`  - ${err}`));
+    process.exit(1);
+  }
+
+  // Create cache instance with config
+  const cache = new Cache(config.getAll());
+
+  // Handle --clear-cache command
   if (argv['clear-cache']) {
     console.log('🧹 Clearing cache...');
 
@@ -96,9 +158,17 @@ function main() {
   console.log('Starting caching proxy server...\n');
   console.log(`Configuration:`);
   console.log(`  Port:   ${argv.port}`);
-  console.log(`  Origin: ${argv.origin}\n`);
+  console.log(`  Origin: ${argv.origin}`);
+  console.log(
+    `  Cache:  ${config.get('cache.enabled') ? 'Enabled' : 'Disabled'}`,
+  );
+  if (config.get('cache.enabled')) {
+    console.log(`  Max Size: ${config.get('cache.maxSize')} entries`);
+    console.log(`  TTL: ${config.get('cache.ttl') / 1000}s`);
+  }
+  console.log();
 
-  const server = new ProxyServer(argv.port, argv.origin);
+  const server = new ProxyServer(argv.port, argv.origin, cache, config);
   server.start();
 
   // Graceful shutdown on Ctrl+C
