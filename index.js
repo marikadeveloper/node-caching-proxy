@@ -77,13 +77,17 @@ const argv = yargs(hideBin(process.argv))
   .version('1.0.0')
   .alias('v', 'version').argv;
 
-/**
- * Handle CLI commands
- */
 function main() {
   // Handle --clear-cache command
   if (argv['clear-cache']) {
     console.log('🧹 Clearing cache...');
+
+    // Show stats before clearing
+    const statsBefore = cache.getStats();
+    console.log(`\nCache before clearing:`);
+    console.log(`  Entries: ${statsBefore.size}`);
+    console.log(`  Size: ${statsBefore.totalSizeKB} KB`);
+
     cache.clear();
     process.exit(0);
   }
@@ -117,7 +121,6 @@ function main() {
     process.exit(0);
   });
 
-  // Handle uncaught errors
   process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error.message);
     process.exit(1);
