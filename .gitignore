@@ -1,3 +1,4 @@
 /node_modules
 .TODO
 cache-data.json
+proxy-config.json
