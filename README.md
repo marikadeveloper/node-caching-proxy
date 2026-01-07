@@ -16,3 +16,26 @@ caching-proxy --port 3000 --origin http://dummyjson.com
 ### Or if you want to run without linking:
 
 node index.js --port 3000 --origin http://dummyjson.com
+
+## Example
+
+### Terminal 1 - Start the proxy:
+
+caching-proxy --port 3000 --origin http://dummyjson.com
+
+### Terminal 2 - Make requests:
+
+First request (should be MISS)
+curl -i http://localhost:3000/products
+
+Look for: X-Cache: MISS in the headers
+
+#### Second request (should be HIT)
+
+curl -i http://localhost:3000/products
+
+Look for: X-Cache: HIT in the headers
+
+#### Clear cache
+
+caching-proxy --clear-cache
