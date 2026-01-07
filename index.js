@@ -8,6 +8,7 @@
  * Handle --port, --origin, --clear-cache flags
  * Start the server or clear cache based on arguments
  */
+
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const ProxyServer = require('./server');
@@ -78,7 +79,6 @@ const argv = yargs(hideBin(process.argv))
   .alias('v', 'version').argv;
 
 function main() {
-  // Handle --clear-cache command
   if (argv['clear-cache']) {
     console.log('🧹 Clearing cache...');
 
@@ -105,16 +105,25 @@ function main() {
   process.on('SIGINT', () => {
     console.log('\n\n👋 Shutting down gracefully...');
 
-    // Show cache stats before exiting
+    // Show detailed cache stats before exiting
     const stats = cache.getStats();
-    console.log(`\nCache Statistics:`);
-    console.log(`  Total cached responses: ${stats.size}`);
+    console.log(`\n📊 Cache Statistics:`);
+    console.log(`  Total entries: ${stats.size}/${stats.maxSize}`);
+    console.log(`  Cache size: ${stats.totalSizeKB} KB`);
+    console.log(`  TTL: ${stats.ttl / 1000}s (${stats.ttl / 60000} minutes)`);
 
     if (stats.size > 0) {
-      console.log(`  Cached URLs:`);
+      console.log(`\n  Cached URLs:`);
       stats.keys.forEach((key) => {
         console.log(`    - ${key}`);
       });
+
+      if (stats.expiringKeys.length > 0) {
+        console.log(`\n  ⏰ Expiring soon:`);
+        stats.expiringKeys.forEach(({ key, expiresIn }) => {
+          console.log(`    - ${key} (in ${expiresIn})`);
+        });
+      }
     }
 
     server.stop();
