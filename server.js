@@ -16,12 +16,17 @@ const axios = require('axios');
 const cache = require('./cache');
 
 class ProxyServer {
-  constructor(port, origin) {
+  constructor(port, origin, cache, config) {
     this.port = port;
     this.origin = origin;
+    this.cache = cache;
+    this.config = config;
     this.server = null;
   }
 
+  /**
+   * Start the proxy server
+   */
   /**
    * Start the proxy server
    */
@@ -59,18 +64,24 @@ class ProxyServer {
     const method = req.method;
     const url = req.url;
 
-    console.log(`\n→ ${method} ${url}`);
+    if (this.config.get('logging.logRequests')) {
+      console.log(`\n→ ${method} ${url}`);
+    }
 
     try {
       // Step 1: Check if response is in cache
-      if (cache.has(method, url)) {
-        console.log('  ✓ Cache HIT');
+      if (this.cache.has(method, url)) {
+        if (this.config.get('logging.logCache')) {
+          console.log('  ✓ Cache HIT');
+        }
         this.sendCachedResponse(req, res, method, url);
         return;
       }
 
       // Step 2: Cache MISS - forward to origin server
-      console.log('  ✗ Cache MISS - Forwarding to origin');
+      if (this.config.get('logging.logCache')) {
+        console.log('  ✗ Cache MISS - Forwarding to origin');
+      }
       await this.forwardRequest(req, res, method, url);
     } catch (error) {
       this.handleError(res, error);
@@ -81,7 +92,7 @@ class ProxyServer {
    * Send a cached response back to the client
    */
   sendCachedResponse(req, res, method, url) {
-    const cached = cache.get(method, url);
+    const cached = this.cache.get(method, url);
 
     // Set the cached response headers
     // We spread the original headers and add our custom X-Cache header
@@ -116,15 +127,15 @@ class ProxyServer {
       url: targetUrl,
       data: body,
       headers: this.getForwardHeaders(req.headers),
+      timeout: this.config.get('server.timeout'),
+      maxRedirects: this.config.get('server.maxRedirects'),
       // Important: Tell axios not to throw on non-2xx responses
-      // We want to cache and return all responses, not just successful ones
       validateStatus: () => true,
     });
 
     // Cache the response only for GET requests and successful responses
-    // You typically don't cache POST/PUT/DELETE or error responses
     if (method === 'GET' && response.status === 200) {
-      cache.set(method, url, response);
+      this.cache.set(method, url, response);
     }
 
     // Send response back to client
