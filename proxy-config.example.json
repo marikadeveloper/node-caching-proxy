@@ -1,0 +1,19 @@
+{
+  "cache": {
+    "maxSize": 100,
+    "ttl": 3600000,
+    "enabled": true,
+    "cacheFile": "cache-data.json",
+    "cleanupInterval": 300000
+  },
+  "server": {
+    "timeout": 30000,
+    "followRedirects": true,
+    "maxRedirects": 5
+  },
+  "logging": {
+    "verbose": false,
+    "logRequests": true,
+    "logCache": true
+  }
+}
